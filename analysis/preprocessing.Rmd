@@ -1,0 +1,104 @@
+---
+title: "preprocessing"
+author: "Alex"
+date: "2020-03-30"
+output: workflowr::wflow_html
+editor_options:
+  chunk_output_type: inline
+---
+
+
+# Load Packages
+
+```{r load_packages}
+
+if (!require("cowplot")) {
+  install.packages("cowplot", dependencies = TRUE)
+  suppressPackageStartupMessages(library(cowplot))
+}
+
+if (!require("Seurat")) {
+  install.packages("Seurat", dependencies = TRUE)
+  suppressPackageStartupMessages(library(Seurat))
+}
+
+if (!require("tidyverse")) {
+  install.packages("tidyverse", dependencies = TRUE)
+  suppressPackageStartupMessages(library(tidyverse))
+}
+
+
+if (!require("harmony")) {
+  install.packages("harmony", dependencies = TRUE)
+  suppressPackageStartupMessages(library(harmony))
+}
+
+if (!require("patchwork")) {
+  install.packages("patchwork", dependencies = TRUE)
+  suppressPackageStartupMessages(library(patchwork))
+}
+
+if (!require("here")) {
+  install.packages("here", dependencies = TRUE)
+  suppressPackageStartupMessages(library(here))
+}
+```
+
+```{r setup}
+knitr::opts_knit$set(root.dir = here())
+```
+
+Load Data
+
+```{r}
+Sample1_data <- Read10X(data.dir = here("data", "MGI0027_1_1A_pre_mRNA_counts", "filtered_feature_bc_matrix"))
+Sample2_data <- Read10X(data.dir = here("data", "MGI0027_1_2A_pre_mRNA_counts", "filtered_feature_bc_matrix"))
+```
+
+Create Seurat Objects
+
+```{r}
+S1 <- CreateSeuratObject(counts = Sample1_data, project = "S1")
+S2 <- CreateSeuratObject(counts = Sample2_data, project = "S2")
+so <- merge(S1, y = S2, add.cell.ids = c("S1", "S2"), project = "hDRG_merged")
+```
+
+## Quality Control
+
+### UMI and Gene Metrics 
+```{r}
+VlnPlot(so, features = c("nCount_RNA", "nFeature_RNA"))
+```
+
+```{r filter_cells}
+
+so <- subset(x = so, 
+              subset= (nCount_RNA >= 500)  & (nFeature_RNA >= 250))
+
+```
+
+## Preprocess (Normalization, Feature Selection, Scaling, PCA)
+
+```{r seurat_to_pca_pre_harmony}
+so <- so %>% Seurat::NormalizeData(verbose = FALSE) %>%
+    FindVariableFeatures(selection.method = "vst", nfeatures = 2000) %>% 
+    ScaleData(verbose = FALSE) %>% 
+    RunPCA(pc.genes = so@var.genes, npcs = 40, verbose = FALSE)
+```
+
+### Check PCAs
+
+```{r}
+DimPlot(so, reduction = "pca")
+```
+
+
+```{r}
+ElbowPlot(so, ndims = 40)
+```
+
+
+```{r}
+saveRDS(so, file = here("output", "preprocessing", "SO_preprocessing.Rds"))
+```
+

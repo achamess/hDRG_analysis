@@ -9,3 +9,13 @@ editor_options:
 ---
 
 Welcome to my research website.
+
+- [Preprocessing](preprocessing.html)
+  - QC metrics
+  - PCA
+- [Clustering](clustering.html)
+  - Clustering
+  - UMAP visualization
+- [Differential Expression](differential.html)
+  - MAST
+  - Visualization (Dotplot, Heatmap)

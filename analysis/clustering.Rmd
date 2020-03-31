@@ -1,0 +1,135 @@
+---
+title: "clustering"
+author: "Alex"
+date: "2020-03-30"
+output: workflowr::wflow_html
+editor_options:
+  chunk_output_type: inline
+---
+
+# Clustering
+
+
+## Load Packages
+
+```{r load_packages}
+
+if (!require("cowplot")) {
+  install.packages("cowplot", dependencies = TRUE)
+  suppressPackageStartupMessages(library(cowplot))
+}
+
+if (!require("Seurat")) {
+  install.packages("Seurat", dependencies = TRUE)
+  suppressPackageStartupMessages(library(Seurat))
+}
+
+if (!require("tidyverse")) {
+  install.packages("tidyverse", dependencies = TRUE)
+  suppressPackageStartupMessages(library(tidyverse))
+}
+
+if (!require("harmony")) {
+  install.packages("harmony", dependencies = TRUE)
+  suppressPackageStartupMessages(library(harmony))
+}
+
+if (!require("patchwork")) {
+  install.packages("patchwork", dependencies = TRUE)
+  suppressPackageStartupMessages(library(patchwork))
+}
+
+if (!require("here")) {
+  install.packages("here", dependencies = TRUE)
+  suppressPackageStartupMessages(library(here))
+}
+
+if (!requireNamespace("BiocManager", quietly = TRUE)){
+  install.packages("BiocManager") 
+}
+
+
+if (!require("reticulate")) {
+  install.packages("reticulate", dependencies = TRUE)
+  suppressPackageStartupMessages(library(reticulate))
+}
+
+
+
+# if (!requireNamespace("BiocManager", quietly = TRUE))
+#     install.packages("BiocManager")
+# 
+# BiocManager::install("MAST")
+
+
+source(here("code", "stacked_violin_seurat.R"))
+source(here("code", "utils.R"))
+
+```
+
+```{r setup}
+knitr::opts_knit$set(root.dir = here())
+
+```
+
+Load Seurat Object from [Preprocessing](preprocessing.html)
+
+```{r load_so}
+so <- read_rds(here("output","preprocessing", "SO_preprocessing.Rds"))
+```
+
+## Clustering
+
+## Cluster at multiple resolutions 
+
+```{r seurat_cluster}
+
+if ( file.exists(here("output","clustering","SO_clustering.Rds"))){ 
+
+  so <- read_rds(here("output","clustering","SO_clustering.Rds"))
+  
+} else {
+  so <- so %>% 
+    RunUMAP(reduction = "pca", dims = 1:40) %>% 
+    FindNeighbors(reduction = "pca", dims = 1:40) %>% 
+    FindClusters(resolution = c(0.6,0.8,1.0,1.4,2.0,3.0,4.0)) %>% 
+    identity()
+
+saveRDS(so, here("output", "clustering", "SO_clustering.Rds"))
+
+} 
+
+```
+
+### Visualize Clusters at different resolutions
+
+```{r fig.width=14, fig.height=16}
+
+resolutions <- so@meta.data %>% select(starts_with("RNA")) %>% colnames()
+UMAP_list <- list()
+
+for (res in resolutions){
+  
+  print(res)
+  res_stem <- res %>% stringr::str_extract(pattern = "res\\.[0-9]\\.[0-9]|res\\.[0-9]")
+  Idents(so) <- res
+  #options(repr.plot.height = 6, repr.plot.width = 8)
+  p <- DimPlot(so, reduction = "umap", label = TRUE, pt.size = .1) + 
+    NoLegend() + ggtitle(res_stem) +
+    theme(plot.title = element_text(hjust = 0.5))
+  UMAP_list[[res]] <- p
+}
+
+UMAP_global_res_compare_plot <- wrap_plots(UMAP_list) 
+
+UMAP_global_res_compare_plot
+
+save_plot(UMAP_global_res_compare_plot, filename = here("output", "clustering", "UMAP_global_res_compare_plot.pdf"), base_width = 16, base_height = 20)
+
+```
+Check number of clusters by resolutions
+```{r}
+get_cluster_number_by_res(so)
+```
+
+

@@ -1,0 +1,135 @@
+---
+title: "Differential Expression"
+author: "Alex"
+date: "2020-03-30"
+output: workflowr::wflow_html
+editor_options:
+  chunk_output_type: inline
+---
+
+# Differential Expression
+
+## Load Packages
+
+```{r load_packages}
+
+if (!require("cowplot")) {
+  install.packages("cowplot", dependencies = TRUE)
+  suppressPackageStartupMessages(library(cowplot))
+}
+
+if (!require("Seurat")) {
+  install.packages("Seurat", dependencies = TRUE)
+  suppressPackageStartupMessages(library(Seurat))
+}
+
+if (!require("tidyverse")) {
+  install.packages("tidyverse", dependencies = TRUE)
+  suppressPackageStartupMessages(library(tidyverse))
+}
+
+if (!require("harmony")) {
+  install.packages("harmony", dependencies = TRUE)
+  suppressPackageStartupMessages(library(harmony))
+}
+
+if (!require("patchwork")) {
+  install.packages("patchwork", dependencies = TRUE)
+  suppressPackageStartupMessages(library(patchwork))
+}
+
+if (!require("here")) {
+  install.packages("here", dependencies = TRUE)
+  suppressPackageStartupMessages(library(here))
+}
+
+if (!requireNamespace("BiocManager", quietly = TRUE)){
+  install.packages("BiocManager") 
+}
+
+
+if (!require("reticulate")) {
+  install.packages("reticulate", dependencies = TRUE)
+  suppressPackageStartupMessages(library(reticulate))
+}
+
+
+
+# if (!requireNamespace("BiocManager", quietly = TRUE))
+#     install.packages("BiocManager")
+# 
+# BiocManager::install("MAST")
+
+
+source(here("code", "stacked_violin_seurat.R"))
+source(here("code", "utils.R"))
+
+```
+
+```{r setup}
+knitr::opts_knit$set(root.dir = here())
+
+```
+
+Load Seurat Object from [Clustering](clustering.html)
+
+```{r load_so}
+so <- read_rds(here("output","clustering", "SO_clustering.Rds"))
+```
+
+```{r FindMarkers, eval=T}
+
+Idents(object = so) <- "RNA_snn_res.1"
+
+if (! file.exists(here("output", "differential", "so_markers_MAST_res1_pct25.csv"))) {
+  so_markers_MAST_res1_pct25 <- FindAllMarkers(so, only.pos = T, test.use = "MAST", min.pct = 0.25)
+  write_csv(so_markers_MAST_res1_pct25, here("output", "differential", "so_markers_MAST_res1_pct25.csv"))
+} else {
+  so_markers_MAST_res1_pct25<- read_csv(here("output", "differential", "so_markers_MAST_res1_pct25.csv"))
+}
+
+```
+
+Top genes
+
+```{r}
+top10_markers_MAST_res1_pct25 <- so_markers_MAST_res1_pct25 %>% 
+  group_by(cluster) %>% 
+  filter(p_val_adj < 0.01) %>% 
+  top_n(n=10, avg_logFC)
+
+top5_markers_MAST_res1_pct25 <- so_markers_MAST_res1_pct25 %>% 
+  group_by(cluster) %>% 
+  filter(p_val_adj < 0.01) %>% 
+  top_n(n=5, avg_logFC)
+```
+
+## Visualization 
+
+```{r}
+all_genes <- rownames(GetAssayData(object = so, slot = "counts")) 
+
+so_all_scaled <- ScaleData(so, features = all_genes)
+```
+
+
+### Dot Plot
+```{r fig.width= 22, fig.height=14}
+DotPlot(so_all_scaled, features = unique(top5_markers_MAST_res1_pct25$gene)) + 
+  scale_color_viridis_c() +
+  RotatedAxis() +
+  theme(axis.text.x = element_text(size=10))
+```
+
+
+
+```{r fig.width= 18, fig.height= 14}
+heatmap_top5_markers_MAST_res1_pct25 <- DoHeatmap(so_all_scaled, features = top5_markers_MAST_res1_pct25$gene, disp.min = 0, label = FALSE) +
+  NoLegend() + 
+  scale_fill_viridis_c()
+
+save_plot(heatmap_top5_markers_MAST_res1_pct25, filename = here("output", "differential", "heatmap_top5_markers_MAST_res1_pct25.png"), base_width = 18, base_height = 14)
+
+heatmap_top5_markers_MAST_res1_pct25
+```
+
